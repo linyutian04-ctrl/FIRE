@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIRE 计算器 - 财务独立 · 提前退休</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --card-light: #334155;
+    --accent: #10b981;
+    --accent-light: #34d399;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --border: #475569;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+    padding: 24px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 {
+    font-size: 2.2rem;
+    background: linear-gradient(135deg, var(--accent-light), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  header p { color: var(--text-dim); font-size: 0.95rem; }
+
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 24px; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    color: var(--accent-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2::before {
+    content: '';
+    width: 4px; height: 18px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .field { margin-bottom: 18px; }
+  .field-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  .field-label span:first-child { color: var(--text-dim); }
+  .field-value {
+    color: var(--accent-light);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--card-light);
+    outline: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(16,185,129,0.5);
+  }
+  .number-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--card-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .number-input:focus { border-color: var(--accent); }
+  .field-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    background: rgba(51,65,85,0.4);
+    border-radius: 6px;
+    border-left: 2px solid var(--card-light);
+  }
+  .field-hint code {
+    color: var(--accent-light);
+    font-size: 0.72rem;
+    background: rgba(16,185,129,0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .result-card {
+    background: var(--card-light);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid var(--accent);
+  }
+  .result-card.warning { border-left-color: var(--warning); }
+  .result-card.danger { border-left-color: var(--danger); }
+  .result-card.blue { border-left-color: var(--blue); }
+  .result-card.purple { border-left-color: var(--purple); }
+  .result-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .result-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  .result-sub {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .fire-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 700px) { .fire-types { grid-template-columns: repeat(2, 1fr); } }
+  .fire-type {
+    background: var(--card-light);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+  }
+  .fire-type.active { border-color: var(--accent); }
+  .fire-type-name { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
+  .fire-type-amt { font-size: 1.15rem; font-weight: 700; }
+  .fire-type-years { font-size: 0.78rem; color: var(--accent-light); margin-top: 4px; }
+
+  .chart-container { position: relative; height: 360px; margin-bottom: 24px; }
+  .chart-container-small { position: relative; height: 280px; }
+
+  .sensitivity-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .sensitivity-table th, .sensitivity-table td {
+    padding: 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .sensitivity-table th { background: var(--card-light); color: var(--text-dim); font-weight: 600; }
+  .sensitivity-table .highlight { background: rgba(16,185,129,0.15); font-weight: 600; color: var(--accent-light); }
+  .sensitivity-table .too-long { color: var(--danger); }
+
+  .insight-box {
+    background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(59,130,246,0.1));
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+    border: 1px solid rgba(16,185,129,0.3);
+  }
+  .insight-box h3 { font-size: 1rem; margin-bottom: 10px; color: var(--accent-light); }
+  .insight-box p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 8px; }
+  .insight-box .metric { color: var(--text); font-weight: 600; }
+
+  .progress-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--card-light);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger), var(--warning), var(--accent));
+    border-radius: 6px;
+    transition: width 0.5s ease;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🔥 FIRE 计算器</h1>
+    <p>Financial Independence · Retire Early — 测一测你距离提前退休还有多远</p>
+  </header>
+
+  <div class="layout">
+    <!-- 输入面板 -->
+    <div>
+      <div class="card">
+        <h2>个人信息</h2>
+        <div class="field">
+          <div class="field-label"><span>当前年龄</span><span class="field-value" id="age-val">30 岁</span></div>
+          <input type="range" id="age" min="18" max="70" value="30">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>财务快照</h2>
+        <div class="field">
+          <div class="field-label"><span>当前净资产（元）</span></div>
+          <input type="number" class="number-input" id="net-worth" value="500000" step="10000">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>月收入（元）</span></div>
+          <input type="number" class="number-input" id="income" value="20000" step="1000">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>月支出（元）</span></div>
+          <input type="number" class="number-input" id="expense" value="8000" step="500">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>投资假设</h2>
+        <div class="field">
+          <div class="field-label"><span>年化投资回报率</span><span class="field-value" id="return-val">7%</span></div>
+          <input type="range" id="return" min="0" max="15" step="0.5" value="7">
+          <div class="field-hint">
+            投资组合每年的<b>名义收益率</b>。代码中按月折算 <code>monthlyReturn = return / 12</code>，
+            参与复利递推 <code>余额 = 余额 × (1 + monthlyReturn) + 月储蓄</code>。<br>
+            参考：A股/美股长期约 7–10%，债券约 3–5%，现金约 1–2%。
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>通货膨胀率</span><span class="field-value" id="inflation-val">3%</span></div>
+          <input type="range" id="inflation" min="0" max="10" step="0.5" value="3">
+          <div class="field-hint">
+            货币购买力每年的下降幅度，用于衡量<b>实际回报</b> = 名义回报率 − 通胀率。<br>
+            当前实现中 FIRE 目标按<b>名义金额</b>计算（提取率已隐含实际回报假设），
+            通胀率主要作为参考指标，用于判断名义目标的实际购买力。参考：中国近年约 2–3%。
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>安全提取率（SWR）</span><span class="field-value" id="swr-val">4%</span></div>
+          <input type="range" id="swr" min="2" max="8" step="0.5" value="4">
+          <div class="field-hint">
+            退休后每年从投资组合中提取的比例。直接决定 FIRE 目标：
+            <code>FIRE目标 = 退休年支出 ÷ SWR</code>。<br>
+            经典 4% 法则源自 Trinity Study：股债组合下提取 4%，30 年以上本金耗尽概率极低。
+            提取率越高 → 所需本金越少，但退休后断供风险越大。
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>退休后支出比例</span><span class="field-value" id="retire-exp-val">80%</span></div>
+          <input type="range" id="retire-exp" min="50" max="120" step="5" value="80">
+          <div class="field-hint">
+            退休后年支出占当前年支出的比例：
+            <code>退休年支出 = 当前月支出 × 12 × 该比例</code>。<br>
+            多数人退休后支出下降（通勤、餐费减少），但医疗、旅行可能上升。
+            80% 是常见假设；若计划退休后环游世界可设 100–120%。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 结果面板 -->
+    <div>
+      <div class="card">
+        <h2>核心结果</h2>
+        <div class="result-grid">
+          <div class="result-card">
+            <div class="result-label">FIRE 目标金额</div>
+            <div class="result-value" id="fire-target">¥0</div>
+            <div class="result-sub">基于年支出 ÷ 提取率</div>
+          </div>
+          <div class="result-card blue">
+            <div class="result-label">距离 FIRE 还需</div>
+            <div class="result-value" id="fire-years">0 年</div>
+            <div class="result-sub" id="fire-age">预计退休年龄：0 岁</div>
+          </div>
+          <div class="result-card purple">
+            <div class="result-label">当前储蓄率</div>
+            <div class="result-value" id="savings-rate">0%</div>
+            <div class="result-sub" id="monthly-savings">月储蓄：¥0</div>
+          </div>
+          <div class="result-card warning">
+            <div class="result-label">FIRE 进度</div>
+            <div class="result-value" id="progress-pct">0%</div>
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="fire-types" id="fire-types"></div>
+      </div>
+
+      <div class="card">
+        <h2>资产增长预测</h2>
+        <div class="chart-container">
+          <canvas id="growthChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>敏感性分析：多少年能 FIRE？</h2>
+        <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px;">
+          行 = 不同年化回报率，列 = 不同储蓄率。绿色高亮为当前配置。
+        </p>
+        <div style="overflow-x:auto;">
+          <table class="sensitivity-table" id="sensitivity-table"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>收入 vs 支出构成</h2>
+        <div class="chart-container-small">
+          <canvas id="breakdownChart"></canvas>
+        </div>
+      </div>
+
+      <div class="insight-box">
+        <h3>💡 个人洞察</h3>
+        <div id="insights"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const fmt = n => '¥' + Math.round(n).toLocaleString('zh-CN');
+const fmtWan = n => {
+  if (Math.abs(n) >= 10000) return (n/10000).toFixed(1) + ' 万';
+  return fmt(n);
+};
+
+const $ = id => document.getElementById(id);
+
+// 绑定滑块显示
+const bindRange = (id, valId, suffix='') => {
+  const el = $(id), v = $(valId);
+  el.addEventListener('input', () => { v.textContent = el.value + suffix; calc(); });
+};
+bindRange('age', 'age-val', ' 岁');
+bindRange('return', 'return-val', '%');
+bindRange('inflation', 'inflation-val', '%');
+bindRange('swr', 'swr-val', '%');
+bindRange('retire-exp', 'retire-exp-val', '%');
+
+['net-worth','income','expense'].forEach(id => $(id).addEventListener('input', calc));
+
+let growthChart, breakdownChart;
+
+function calc() {
+  const age = +$('age').value;
+  const netWorth = +$('net-worth').value;
+  const income = +$('income').value;
+  const expense = +$('expense').value;
+  const returnRate = +$('return').value / 100;
+  const inflation = +$('inflation').value / 100;
+  const swr = +$('swr').value / 100;
+  const retireExpRatio = +$('retire-exp').value / 100;
+
+  const monthlySavings = income - expense;
+  const savingsRate = income > 0 ? (monthlySavings / income * 100) : 0;
+  const annualSavings = monthlySavings * 12;
+  const monthlyReturn = returnRate / 12;
+
+  // 退休后年支出 = 当前年支出 * 退休支出比例
+  const retireAnnualExpense = expense * 12 * retireExpRatio;
+  // FIRE 目标（不考虑通胀的名义值，但提取率已经隐含了实际回报率假设）
+  // 更严谨：用实际回报率计算。这里简化为名义目标。
+  const fireTarget = retireAnnualExpense / swr;
+
+  // 计算达到FIRE目标的年数（按月复利 + 每月定投）
+  // FV = PV*(1+r)^n + PMT * [((1+r)^n - 1)/r]
+  let months = 0;
+  const maxMonths = 12 * 80;
+  let balance = netWorth;
+  if (monthlySavings <= 0 && balance < fireTarget) {
+    months = Infinity;
+  } else {
+    while (balance < fireTarget && months < maxMonths) {
+      balance = balance * (1 + monthlyReturn) + monthlySavings;
+      months++;
+    }
+  }
+  const yearsToFire = months === Infinity ? '∞' : (months / 12).toFixed(1);
+  const retireAge = months === Infinity ? '—' : Math.round(age + months/12);
+  const progress = Math.min(100, netWorth / fireTarget * 100);
+
+  // 更新核心结果
+  $('fire-target').textContent = fmtWan(fireTarget);
+  $('fire-years').textContent = yearsToFire + ' 年';
+  $('fire-age').textContent = months === Infinity ? '需调整收支' : `预计退休年龄：${retireAge} 岁`;
+  $('savings-rate').textContent = savingsRate.toFixed(0) + '%';
+  $('monthly-savings').textContent = `月储蓄：${fmt(monthlySavings)}`;
+  $('progress-pct').textContent = progress.toFixed(1) + '%';
+  $('progress-fill').style.width = progress + '%';
+
+  // FIRE 类型
+  const leanTarget = expense * 12 * 0.7 / swr;
+  const fatTarget = expense * 12 * 1.5 / swr;
+  const coastTarget = expense * 12 * retireExpRatio / swr; // 不再投入，靠复利达到的目标
+  
+  const calcYears = (target) => {
+    if (monthlySavings <= 0 && netWorth < target) return '∞';
+    let b = netWorth, m = 0;
+    while (b < target && m < maxMonths) { b = b*(1+monthlyReturn)+monthlySavings; m++; }
+    return m >= maxMonths ? '∞' : (m/12).toFixed(1);
+  };
+
+  const fireTypes = [
+    { name: 'Lean FIRE', desc: '极简生活', target: leanTarget, color: '#94a3b8' },
+    { name: 'Regular FIRE', desc: '标准退休', target: coastTarget, color: '#10b981' },
+    { name: 'Coast FIRE', desc: '半退休', target: coastTarget * 0.8, color: '#3b82f6' },
+    { name: 'Fat FIRE', desc: '充裕退休', target: fatTarget, color: '#f59e0b' },
+  ];
+  $('fire-types').innerHTML = fireTypes.map(t => {
+    const y = calcYears(t.target);
+    const active = t.name === 'Regular FIRE';
+    return `<div class="fire-type ${active?'active':''}">
+      <div class="fire-type-name">${t.name}</div>
+      <div class="fire-type-amt" style="color:${t.color}">${fmtWan(t.target)}</div>
+      <div class="fire-type-years">${y === '∞' ? '难以达成' : y + ' 年'}</div>
+    </div>`;
+  }).join('');
+
+  // 资产增长曲线
+  updateGrowthChart(netWorth, monthlySavings, monthlyReturn, fireTarget, age);
+
+  // 敏感性分析
+  updateSensitivity(netWorth, expense, swr, retireExpRatio);
+
+  // 收支构成
+  updateBreakdown(income, expense);
+
+  // 洞察
+  updateInsights(savingsRate, yearsToFire, retireAge, monthlySavings, fireTarget, netWorth, returnRate, swr);
+}
+
+function updateGrowthChart(pv, pmt, r, target, startAge) {
+  const labels = [], data = [], targetLine = [];
+  let balance = pv;
+  const maxYears = 60;
+  for (let y = 0; y <= maxYears; y++) {
+    labels.push(startAge + y + ' 岁');
+    data.push(Math.round(balance));
+    targetLine.push(target);
+    // 按月计算一年
+    for (let m = 0; m < 12; m++) balance = balance * (1 + r) + pmt;
+    if (balance > target * 5) break;
+  }
+  // 截断到FIRE点之后10年
+  const fireIdx = data.findIndex(v => v >= target);
+  const endIdx = fireIdx >= 0 ? Math.min(data.length, fireIdx + 11) : data.length;
+
+  const ctx = $('growthChart').getContext('2d');
+  if (growthChart) growthChart.destroy();
+  growthChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels.slice(0, endIdx),
+      datasets: [
+        {
+          label: '资产净值',
+          data: data.slice(0, endIdx),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.15)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 3,
+        },
+        {
+          label: 'FIRE 目标线',
+          data: targetLine.slice(0, endIdx),
+          borderColor: '#f59e0b',
+          borderDash: [6, 4],
+          pointRadius: 0,
+          borderWidth: 2,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0' } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y)
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: '#334155' } },
+        y: {
+          ticks: { color: '#94a3b8', callback: v => fmtWan(v) },
+          grid: { color: '#334155' }
+        }
+      }
+    }
+  });
+}
+
+function updateSensitivity(pv, expense, swr, retireExpRatio) {
+  const target = expense * 12 * retireExpRatio / swr;
+  const returns = [3, 5, 7, 9, 11];
+  const savingsRates = [20, 40, 50, 60, 80];
+  const income = +$('income').value;
+  const currentSR = income > 0 ? Math.round((income - expense) / income * 100 / 10) * 10 : 50;
+  const currentR = +$('return').value;
+
+  const calcYears = (sr, ret) => {
+    const monthlySaving = income * sr / 100;
+    const r = ret / 100 / 12;
+    if (monthlySaving <= 0 && pv < target) return '∞';
+    let b = pv, m = 0;
+    while (b < target && m < 1200) { b = b*(1+r)+monthlySaving; m++; }
+    return m >= 1200 ? '∞' : (m/12).toFixed(0);
+  };
+
+  let html = '<tr><th>回报率 \\ 储蓄率</th>';
+  savingsRates.forEach(sr => { html += `<th>${sr}%</th>`; });
+  html += '</tr>';
+
+  returns.forEach(ret => {
+    html += `<tr><td><strong>${ret}%</strong></td>`;
+    savingsRates.forEach(sr => {
+      const y = calcYears(sr, ret);
+      const isCurrent = Math.abs(sr - currentSR) < 5 && Math.abs(ret - currentR) < 1;
+      const cls = isCurrent ? 'highlight' : (y === '∞' || +y > 40 ? 'too-long' : '');
+      html += `<td class="${cls}">${y === '∞' ? '∞' : y + ' 年'}</td>`;
+    });
+    html += '</tr>';
+  });
+  $('sensitivity-table').innerHTML = html;
+}
+
+function updateBreakdown(income, expense) {
+  const saving = income - expense;
+  const ctx = $('breakdownChart').getContext('2d');
+  if (breakdownChart) breakdownChart.destroy();
+  breakdownChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['月支出', '月储蓄'],
+      datasets: [{
+        data: [expense, Math.max(0, saving)],
+        backgroundColor: ['#ef4444', '#10b981'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 16 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.label + ': ' + fmt(ctx.parsed)
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateInsights(sr, years, retireAge, monthlySavings, target, netWorth, returnRate, swr) {
+  const insights = [];
+  
+  if (monthlySavings <= 0) {
+    insights.push('⚠️ 当前支出 ≥ 收入，无法积累资产。请先审视开支，提高储蓄率。');
+  } else {
+    if (sr >= 70) insights.push(`🎉 储蓄率高达 ${sr.toFixed(0)}%，属于超级储蓄者，FIRE 速度会非常快！`);
+    else if (sr >= 50) insights.push(`✅ 储蓄率 ${sr.toFixed(0)}%，表现优秀，坚持下去能较早实现 FIRE。`);
+    else if (sr >= 30) insights.push(`👍 储蓄率 ${sr.toFixed(0)}%，处于健康区间。进一步降低开支可显著加速。`);
+    else insights.push(`📉 储蓄率仅 ${sr.toFixed(0)}%，距离 FIRE 较远。建议减少非必要支出。`);
+  }
+
+  if (years !== '∞') {
+    if (+years <= 5) insights.push(`🚀 只需约 ${years} 年即可达成 FIRE，目标已近在咫尺！`);
+    else if (+years <= 15) insights.push(`⏳ 约 ${years} 年可退休，属于较快路径。`);
+    else if (+years <= 30) insights.push(`📅 约 ${years} 年达成 FIRE，需持续保持投资纪律。`);
+    else insights.push(`🐢 还需 ${years} 年，考虑提高投资回报率或储蓄率来加速。`);
+  }
+
+  if (returnRate >= 0.1) insights.push(`⚠️ 假设的年化回报率 ${(returnRate*100).toFixed(1)}% 偏乐观，长期高回报伴随高波动，建议保守一些。`);
+  if (swr > 0.04) insights.push(`💡 提取率 ${(swr*100).toFixed(1)}% 高于经典 4% 法则，退休后本金耗尽风险增加。`);
+  if (swr < 0.03) insights.push(`🛡️ 提取率 ${(swr*100).toFixed(1)}% 较保守，安全性更高但所需本金更多。`);
+
+  insights.push(`📊 你已完成 FIRE 目标的 ${(netWorth/target*100).toFixed(1)}%，继续复利增长。`);
+
+  $('insights').innerHTML = insights.map(i => `<p>${i}</p>`).join('');
+}
+
+calc();
+</script>
+</body>
+</html>
